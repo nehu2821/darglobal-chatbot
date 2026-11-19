@@ -1,0 +1,7 @@
+.env
+.git
+.venv
+__pycache__
+scraper
+requirements-scraper.txt
+README.md

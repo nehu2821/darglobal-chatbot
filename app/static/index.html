@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ask about DarGlobal and Wasalt</title>
+<style>
+  :root {
+    --bg: #eef1ef; --panel: #ffffff; --ink: #17211f; --muted: #5d6b67;
+    --line: #d5dcd9; --accent: #0f5c55; --accent-ink: #ffffff; --user: #dcebe8;
+    --serif: Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101716; --panel: #172120; --ink: #e6eeec; --muted: #93a4a0;
+      --line: #2a3735; --accent: #5cc2b5; --accent-ink: #0b1514; --user: #1f3532;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--sans); display: flex; justify-content: center; }
+  .app { width: 100%; max-width: 760px; height: 100%; display: flex; flex-direction: column; padding: 0 16px; }
+  header { padding: 28px 0 16px; }
+  h1 { font: 600 clamp(1.6rem, 4vw, 2.1rem)/1.15 var(--serif); margin: 0 0 6px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); max-width: 60ch; }
+  #log { flex: 1; overflow-y: auto; padding: 8px 0 16px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { display: flex; flex-direction: column; max-width: 88%; }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .bubble { padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .user .bubble { background: var(--user); }
+  .bot .bubble { background: var(--panel); border: 1px solid var(--line); }
+  .bot.error .bubble { border-color: #b4483c; }
+  .src { margin-top: 6px; font-size: 0.85rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .src a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .chips button { background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 0.9rem; cursor: pointer; }
+  .chips button:hover { border-color: var(--accent); }
+  form { display: flex; gap: 8px; padding: 12px 0 20px; border-top: 1px solid var(--line); }
+  input { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; }
+  button.send { font: inherit; font-weight: 600; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 10px; padding: 0 20px; cursor: pointer; }
+  button:disabled { opacity: 0.55; cursor: progress; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .dots span { display: inline-block; width: 6px; height: 6px; margin-right: 4px; border-radius: 50%; background: var(--muted); animation: blink 1s infinite; }
+  .dots span:nth-child(2) { animation-delay: .15s; } .dots span:nth-child(3) { animation-delay: .3s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .dots span { animation: none; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <h1>Ask about DarGlobal and Wasalt</h1>
+    <p>Answers come from the public pages of both websites, with links to where each answer was found.</p>
+  </header>
+  <section id="log" aria-live="polite"></section>
+  <div class="chips" id="chips"></div>
+  <form id="form">
+    <input id="input" maxlength="500" autocomplete="off" placeholder="Ask about projects, locations or listings" aria-label="Your question">
+    <button class="send" id="send" type="submit">Send</button>
+  </form>
+</main>
+<script>
+const log = document.getElementById('log');
+const form = document.getElementById('form');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const chips = document.getElementById('chips');
+const history = [];
+
+['What projects does DarGlobal have?', 'What is Wasalt?', 'Which locations does DarGlobal develop in?']
+  .forEach(q => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = q;
+    b.onclick = () => ask(q);
+    chips.appendChild(b);
+  });
+
+function add(role, text, sources, isError) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + role + (isError ? ' error' : '');
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+  if (sources && sources.length) {
+    const s = document.createElement('div');
+    s.className = 'src';
+    sources.forEach(x => {
+      const a = document.createElement('a');
+      a.href = x.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.textContent = x.title || x.url; a.title = x.url;
+      s.appendChild(a);
+    });
+    wrap.appendChild(s);
+  }
+  log.appendChild(wrap);
+  log.scrollTop = log.scrollHeight;
+  return wrap;
+}
+
+async function ask(text) {
+  text = text.trim();
+  if (!text || sendBtn.disabled) return;
+  chips.remove();
+  add('user', text);
+  input.value = '';
+  sendBtn.disabled = true;
+  const pending = add('bot', '');
+  pending.firstChild.innerHTML = '<span class="dots"><span></span><span></span><span></span></span>';
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, history: history.slice(-6) }),
+    });
+    const data = await res.json();
+    pending.remove();
+    if (!res.ok) {
+      add('bot', data.detail || 'Something went wrong. Please try again.', null, true);
+    } else {
+      add('bot', data.answer, data.sources);
+      history.push({ role: 'user', content: text }, { role: 'assistant', content: data.answer });
+    }
+  } catch (e) {
+    pending.remove();
+    add('bot', 'Could not reach the server. Check your connection and try again.', null, true);
+  }
+  sendBtn.disabled = false;
+  input.focus();
+}
+
+form.addEventListener('submit', e => { e.preventDefault(); ask(input.value); });
+</script>
+</body>
+</html>
